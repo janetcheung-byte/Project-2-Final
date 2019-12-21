@@ -14,6 +14,7 @@ def keys(name=None):
         print(f'Returning the key for {name}')
         conn.close()
         print('Connection to keys.db closed')
+
         
     else:
         

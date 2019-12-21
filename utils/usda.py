@@ -5,7 +5,7 @@ import urllib.parse
 import requests
 from pandas.io.json import json_normalize
 from pathlib import Path
-from connections import keys
+from utils.connections import keys
 
 
 #DB Connection
@@ -20,8 +20,11 @@ class USDA():
         self.crop = crop
         self.year = year
 
+
+    key = key['value'][0]
+
     #USDA API
-    def crop_stat(self,key=key):
+    def crop_survey(self,key=key):
         
         get_url = 'http://quickstats.nass.usda.gov/api/api_GET/?'
 
@@ -51,7 +54,7 @@ class USDA():
             df = json_normalize(resp['data'])
 
         
-            data = self.prep_stat_data(df).drop_duplicates(subset='county_code',keep='first')
+            data = self.prep_survey(df).drop_duplicates(subset='countycd',keep='first')
             print('Success!')
             
         except requests.exceptions.RequestException as e:
@@ -68,7 +71,7 @@ class USDA():
         return df
 
 
-    def prep_stat_data(self,df):
+    def prep_survey(self,df):
 
         cols = ['county_code','county_name','state_ansi','state_name',
             'state_alpha','commodity_desc','state_fips_code',
@@ -86,12 +89,16 @@ class USDA():
         
         #Convert values to int
         data['county_code'] = data['county_code'].astype('int')
+        data['AREA HARVESTED'] = data['AREA HARVESTED'].replace(regex=True,to_replace=r'\D',value=r'').astype('int')
+        data['AREA PLANTED'] = data['AREA PLANTED'].replace(regex=True,to_replace=r'\D',value=r'').astype('int')
+        data['PRODUCTION'] = data['PRODUCTION'].replace(regex=True,to_replace=r'\D',value=r'').astype('int')
 
-        data.rename(columns={'county_code':'countycd','county_name':'countyname',
+        final = data.rename(columns={'county_code':'countycd','county_name':'countyname',
                                 'state_ansi':'statenbr','state_alpha':'statecd',
-                                'commodity_desc':'crop'})
+                                'commodity_desc':'crop','AREA HARVESTED':'areaharvested',
+                                'AREA PLANTED':'areaplanted','PRODUCTION':'production','YIELD':'yield'})
         
-        return data
+        return final
 
 
 
