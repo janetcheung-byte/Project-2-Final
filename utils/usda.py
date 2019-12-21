@@ -151,8 +151,8 @@ class USDA():
         
         self.regression_results = pd.DataFrame()
 
-        self.X = df.areaharvested.values.reshape(-1,1)
-        self.y = df.production
+        X = df.areaharvested.values.reshape(-1,1)
+        y = df.production
 
         model.fit(X,y)
         self.predictions = model.predict(X)
