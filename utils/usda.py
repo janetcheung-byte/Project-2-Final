@@ -15,16 +15,16 @@ key = keys()
 
 class USDA():
 
-    def __init__(self,state,crop,year):
+    def __init__(self,state,crop):
         self.state = state
         self.crop = crop
-        self.year = year
+   
 
 
     key = key['value'][0]
 
     #USDA API
-    def crop_survey(self,key=key):
+    def crop_survey(self,year,key=key):
         
         get_url = 'http://quickstats.nass.usda.gov/api/api_GET/?'
 
@@ -37,7 +37,7 @@ class USDA():
                         'commodity_desc':self.crop,
                         'agg_level_desc':'COUNTY',
                         'state_alpha':self.state,
-                        'year':self.year,
+                        'year':year,
                         'format':'JSON'}
 
     
@@ -51,16 +51,16 @@ class USDA():
         try:
             resp = requests.get(url).json()
             print('Preparing dataframe')
-            df = json_normalize(resp['data'])
+            data = json_normalize(resp['data'])
 
         
-            data = self.prep_survey(df).drop_duplicates(subset='countycd',keep='first')
+            df = self.prep_survey(data).drop_duplicates(subset='countycd',keep='first')
             print('Success!')
             
         except requests.exceptions.RequestException as e:
             print(e)
 
-        return data
+        return df
 
 
     def loss_hist(self):
@@ -70,6 +70,11 @@ class USDA():
 
         return df
 
+    def weather_hist(self):
+
+        data = pd.read_csv(Path('./data/weather_hist.csv'))
+        df = data[data.statecd==self.state]
+        return df
 
     def prep_survey(self,df):
 
@@ -100,6 +105,32 @@ class USDA():
         
         return final
 
+
+    def features(self):
+
+        years = [2014,2015,2016,2017,2018]
+        sur_list = []
+
+        for year in range(len(years)):
+            sur = self.crop_survey(years[year])
+            sur_list.append(sur)
+
+
+        loss = self.loss_hist()
+        wthr = self.weather_hist()
+        sur = pd.concat(sur_list)
+
+        df = pd.merge(sur,loss[['countycd','year','totalacreloss',
+                                    'total_events','imdemnityamt']],
+                                on=['countycd','year'],
+                                how='left')
+
+        final = pd.merge(df,wthr[['statecd','year','percipavg', 'droughtavg', 
+                                'tempavg', 'shortdroughtavg','mintempavg',
+                                 'maxtempavg']],
+                             on = ['statecd','year'],how='left')
+        
+        return final
 
 
 
