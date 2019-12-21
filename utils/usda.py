@@ -6,11 +6,17 @@ import requests
 from pandas.io.json import json_normalize
 from pathlib import Path
 from utils.connections import keys
+from sklearn.linear_model import LinearRegression
+
 
 
 #DB Connection
 conn = sqlite3.connect(Path('./data/keys.db'))
 key = keys()
+
+
+#Instantiate Model
+regression = LinearRegression()
 
 
 class USDA():
@@ -20,7 +26,6 @@ class USDA():
         self.crop = crop
    
 
-
     key = key['value'][0]
 
     #USDA API
@@ -29,7 +34,7 @@ class USDA():
         get_url = 'http://quickstats.nass.usda.gov/api/api_GET/?'
 
         #Update query with key 
-        print('Passing key to query params..')
+        #print('Passing key to query params..')
         query_params = {'key':key,
                         'source_desc':'SURVEY',
                         'sector_desc': 'CROPS',
@@ -45,17 +50,17 @@ class USDA():
         querystring = urllib.parse.urlencode(query_params)
         url = get_url + querystring
         
-        print(f'Connecting to {get_url}')
+        #print(f'Connecting to {get_url}')
 
         #API Response
         try:
             resp = requests.get(url).json()
-            print('Preparing dataframe')
+            #print(f'Preparing dataframe for {year}')
             data = json_normalize(resp['data'])
 
         
             df = self.prep_survey(data).drop_duplicates(subset='countycd',keep='first')
-            print('Success!')
+            #print('Success!')
             
         except requests.exceptions.RequestException as e:
             print(e)
@@ -131,6 +136,35 @@ class USDA():
                              on = ['statecd','year'],how='left')
         
         return final
+
+
+    def linear_regression(self,model=regression):
+
+        df = self.features()
+
+        
+        res = []
+        results = pd.DataFrame()
+
+        X = df.areaharvested.values.reshape(-1,1)
+        y = df.production
+
+        model.fit(X,y)
+        predictions = model.predict(X)
+        results['coef'] = model.coef_
+        results['intercept']=model.intercept_
+        res.append(results)
+        res.append(predictions)
+        res.append(df)
+
+
+
+        return res
+
+
+
+
+
 
 
 
