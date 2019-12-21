@@ -6,7 +6,11 @@ import requests
 from pandas.io.json import json_normalize
 from pathlib import Path
 from utils.connections import keys
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression,LogisticRegression
+from sklearn.model_selection import train_test_split
+import numpy as np
+from sklearn.metrics import classification_report
+
 
 
 
@@ -17,6 +21,7 @@ key = keys()
 
 #Instantiate Model
 regression = LinearRegression()
+
 
 
 class USDA():
@@ -55,12 +60,12 @@ class USDA():
         #API Response
         try:
             resp = requests.get(url).json()
-            #print(f'Preparing dataframe for {year}')
+
             data = json_normalize(resp['data'])
 
         
             df = self.prep_survey(data).drop_duplicates(subset='countycd',keep='first')
-            #print('Success!')
+            #print('Yay!')
             
         except requests.exceptions.RequestException as e:
             print(e)
@@ -113,10 +118,11 @@ class USDA():
 
     def features(self):
 
-        years = [2014,2015,2016,2017,2018]
+        years = [2011,2012,2013,2014,2015,2016,2017,2018]
         sur_list = []
 
         for year in range(len(years)):
+            print(f'Preparing dataframe for {years[year]}')
             sur = self.crop_survey(years[year])
             sur_list.append(sur)
 
@@ -143,24 +149,58 @@ class USDA():
         df = self.features()
 
         
-        res = []
-        results = pd.DataFrame()
+        self.regression_results = pd.DataFrame()
 
-        X = df.areaharvested.values.reshape(-1,1)
-        y = df.production
+        self.X = df.areaharvested.values.reshape(-1,1)
+        self.y = df.production
 
         model.fit(X,y)
-        predictions = model.predict(X)
-        results['coef'] = model.coef_
-        results['intercept']=model.intercept_
-        res.append(results)
-        res.append(predictions)
-        res.append(df)
+        self.predictions = model.predict(X)
+        self.predictions
+        self.regression_results['coef'] = model.coef_
+        self.regression_results['intercept']=model.intercept_
+        # res.append(results)
+        # res.append(predictions)
+        # res.append(df)
+
+        return 'done!'
 
 
+    
+    def classifier(self):
 
-        return res
 
+        data = self.features()
+        #Client Tolerance Threshold
+        data['lossrisk'] = np.where(data['total_events']>=6,'high','low')
+        data.drop(columns=['countyname','state_name','crop','year','statenbr','statecd'],inplace=True)
+        data.dropna(inplace=True)
+
+        #Define Variables
+        y = data['lossrisk']
+        X = data.drop(columns='lossrisk')
+
+        #Train Test Split
+        X_train,X_test,y_train,y_test = train_test_split(X,
+                                                 y,
+                                                 random_state=1,
+                                                 stratify=y)
+
+
+        classifier = LogisticRegression(solver='lbfgs',random_state=1)
+        classifier
+
+        classifier.fit(X_train,y_train)
+
+        print(f'Training Score{classifier.score(X_train,y_train)}')
+        print(f'Testing Score{classifier.score(X_test,y_test)}')
+
+        predictions = classifier.predict(X_test)
+        self.results = pd.DataFrame({'predictions':predictions,'Actual':y_test}).reset_index(drop=True)
+        self.report = classification_report(y_test,predictions)
+
+        return self.report
+    
 
 
 
